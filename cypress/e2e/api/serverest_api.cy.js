@@ -1,33 +1,34 @@
 describe('Testes de API - ServeRest', () => {
   const apiUrl = Cypress.env('apiBaseUrl');
   let usuario;
+  let token;
 
-  beforeEach(() => {
+  before(() => {
+    // Preparação única: gera massa, cadastra e obtém token para todo o conjunto de testes
     cy.gerarUsuario().then((user) => {
       usuario = user;
+      cy.request('POST', `${apiUrl}/usuarios`, usuario);
+      cy.getToken(usuario.email, usuario.password).then((t) => {
+        token = t;
+      });
     });
   });
 
   it('CT01 - Deve cadastrar um novo usuário com sucesso', () => {
-    // Act
-    cy.request('POST', `${apiUrl}/usuarios`, usuario).then((response) => {
-      // Assert
-      expect(response.status).to.eq(201);
-      expect(response.body.message).to.eq('Cadastro realizado com sucesso');
-      expect(response.body).to.have.property('_id');
+    cy.gerarUsuario().then((novoUsuario) => {
+      cy.request('POST', `${apiUrl}/usuarios`, novoUsuario).then((response) => {
+        expect(response.status).to.eq(201);
+        expect(response.body.message).to.eq('Cadastro realizado com sucesso');
+        expect(response.body).to.have.property('_id');
+      });
     });
   });
 
   it('CT02 - Deve realizar login com um usuário válido', () => {
-    // Arrange
-    cy.request('POST', `${apiUrl}/usuarios`, usuario);
-
-    // Act
     cy.request('POST', `${apiUrl}/login`, {
       email: usuario.email,
       password: usuario.password
     }).then((response) => {
-      // Assert
       expect(response.status).to.eq(200);
       expect(response.body.message).to.eq('Login realizado com sucesso');
       expect(response.body).to.have.property('authorization');
@@ -35,30 +36,19 @@ describe('Testes de API - ServeRest', () => {
   });
 
   it('CT03 - Deve cadastrar um produto com sucesso usando Fixture', () => {
-    // Arrange
-    cy.request('POST', `${apiUrl}/usuarios`, usuario);
-    cy.request('POST', `${apiUrl}/login`, {
-      email: usuario.email,
-      password: usuario.password
-    }).then((responseLogin) => {
-      const token = responseLogin.body.authorization;
+    cy.fixture('produto').then((dadosProduto) => {
+      // Timestamp garante unicidade do nome para evitar conflito de duplicação no servidor
+      dadosProduto.nome = `${dadosProduto.nome} - ${new Date().getTime()}`;
 
-      cy.fixture('produto').then((dadosProduto) => {
-        // Necessário concatenar timestamp ao nome do produto para evitar erro 400 de duplicação
-        dadosProduto.nome = `${dadosProduto.nome} - ${new Date().getTime()}`;
-
-        // Act
-        cy.request({
-          method: 'POST',
-          url: `${apiUrl}/produtos`,
-          headers: { authorization: token },
-          body: dadosProduto
-        }).then((responseProduto) => {
-          // Assert
-          expect(responseProduto.status).to.eq(201);
-          expect(responseProduto.body.message).to.eq('Cadastro realizado com sucesso');
-          expect(responseProduto.body).to.have.property('_id');
-        });
+      cy.request({
+        method: 'POST',
+        url: `${apiUrl}/produtos`,
+        headers: { authorization: token },
+        body: dadosProduto
+      }).then((responseProduto) => {
+        expect(responseProduto.status).to.eq(201);
+        expect(responseProduto.body.message).to.eq('Cadastro realizado com sucesso');
+        expect(responseProduto.body).to.have.property('_id');
       });
     });
   });

@@ -11,3 +11,24 @@ Cypress.Commands.add('gerarUsuario', () => {
     administrador: 'true'
   };
 });
+
+Cypress.Commands.add('login', (email, password) => {
+  cy.session([email, password], () => {
+    cy.visit('/login');
+    cy.get('[data-testid="email"]').type(email);
+    cy.get('[data-testid="senha"]').type(password);
+    cy.get('[data-testid="entrar"]').click();
+    
+    cy.url().should('include', '/admin/home');
+  });
+});
+
+Cypress.Commands.add('getToken', (email, password) => {
+  return cy.request({
+    method: 'POST',
+    url: `${Cypress.env('apiBaseUrl')}/login`,
+    body: { email, password }
+  }).then((response) => {
+    return response.body.authorization;
+  });
+});
