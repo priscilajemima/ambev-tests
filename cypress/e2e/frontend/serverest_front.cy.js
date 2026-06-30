@@ -4,53 +4,61 @@ describe('Testes E2E Frontend - ServeRest', () => {
   beforeEach(() => {
     cy.gerarUsuario().then((user) => {
       usuario = user;
+      cy.request('POST', `${Cypress.env('apiBaseUrl')}/usuarios`, usuario);
+      cy.login(usuario.email, usuario.password);
     });
   });
 
   it('CT04 - Deve realizar o cadastro de um novo usuário administrador', () => {
-    // Arrange
-    cy.visit('/cadastrarusuarios');
-    
-    // Act
-    cy.get('[data-testid="nome"]').type(usuario.nome);
-    cy.get('[data-testid="email"]').type(usuario.email);
-    cy.get('[data-testid="password"]').type(usuario.password);
-    cy.get('[data-testid="checkbox"]').check();
-    cy.get('[data-testid="cadastrar"]').click();
+    cy.gerarUsuario().then((usuarioUnico) => {
+      cy.visit('/cadastrarusuarios');
+      
+      cy.get('[data-testid="nome"]').type(usuarioUnico.nome);
+      cy.get('[data-testid="email"]').type(usuarioUnico.email);
+      cy.get('[data-testid="password"]').type(usuarioUnico.password);
+      cy.get('[data-testid="checkbox"]').check();
+      cy.get('[data-testid="cadastrar"]').click();
 
-    // Assert
-    cy.get('.alert').should('contain', 'Cadastro realizado com sucesso');
-    cy.url().should('include', '/admin/home');
+      cy.get('.alert').should('contain', 'Cadastro realizado com sucesso');
+      cy.url().should('include', '/admin/home');
+    });
   });
 
-  it('CT05 - Deve realizar login com sucesso', () => {
-    // Arrange: Cadastro prévio via API para otimizar o tempo de execução do teste E2E
-    cy.request('POST', `${Cypress.env('apiBaseUrl')}/usuarios`, usuario);
-    cy.visit('/login');
-
-    // Act
-    cy.get('[data-testid="email"]').type(usuario.email);
-    cy.get('[data-testid="senha"]').type(usuario.password);
-    cy.get('[data-testid="entrar"]').click();
-
-    // Assert
-    cy.url().should('include', '/admin/home');
-    cy.get('h1').should('contain', `Bem Vindo`);
+  it('CT05 - Deve acessar a home com sucesso após login', () => {
+    cy.visit('/admin/home');
+    cy.get('h1').should('contain', 'Bem Vindo');
   });
 
   it('CT06 - Deve exibir mensagem de erro ao tentar login com senha inválida', () => {
-    // Arrange
-    cy.request('POST', `${Cypress.env('apiBaseUrl')}/usuarios`, usuario);
     cy.visit('/login');
-
-    // Act
     cy.get('[data-testid="email"]').type(usuario.email);
     cy.get('[data-testid="senha"]').type('senhaIncorreta123');
     cy.get('[data-testid="entrar"]').click();
 
-    // Assert
     cy.get('.alert')
       .should('be.visible')
       .and('contain', 'Email e/ou senha inválidos');
+  });
+
+  it('CT07 - Deve cadastrar, listar e excluir um novo usuário', () => {
+    cy.visit('/admin/cadastrarusuarios');
+
+    const novoNome = `Novo QA ${new Date().getTime()}`;
+    const novoEmail = `novo_qa${new Date().getTime()}@qa.com`;
+
+    cy.get('[data-testid="nome"]').type(novoNome);
+    cy.get('[data-testid="email"]').type(novoEmail);
+    cy.get('[data-testid="password"]').type('senha123');
+    cy.get('[data-testid="checkbox"]').check();
+    cy.get('[data-testid="cadastrarUsuario"]').click();
+
+    cy.url().should('include', '/admin/listarusuarios');
+    cy.contains('td', novoNome).should('be.visible');
+
+    cy.contains('tr', novoEmail)
+      .contains('Excluir')
+      .click();
+
+    cy.contains('td', novoEmail).should('not.exist');
   });
 });
